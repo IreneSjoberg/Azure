@@ -1,0 +1,66 @@
+parameters: 
+
+  serviceConnectionName: ''
+  subscriptionId: ''
+  location: ''
+  namePrefix: ''
+
+  # Tags
+  tags: >
+    {
+      "Solution": "Core Setup",
+      "CreatedBy": "$(Build.RequestedForEmail)",
+      "ManagedBy": "Orange",
+      "Pipeline": "$(Build.DefinitionName)",
+      "PipelineBuildNumber": "$(Build.BuildNumber)",
+      "PipelineJob": "$(System.JobDisplayName)",
+      "PipelineStage": "$(System.StageDisplayName)",
+      "ProjectName": "$(System.TeamProject)",
+      "Reason": "$(Build.Reason)",
+      "Repository": "$(Build.Repository.Name)",
+      "SourceBranchName": "$(Build.SourceBranchName)",
+      "SourceVersion": "$(Build.SourceVersion)"
+    }
+
+  # Template pathing
+  templateRootFolder: $(System.DefaultWorkingDirectory)/services/core/yaml-templates
+
+steps:
+    
+- task: AzureResourceManagerTemplateDeployment@3
+  displayName: Deploy Core Resources
+  inputs:
+    deploymentScope: Subscription
+    azureResourceManagerConnection: ${{ parameters.serviceConnectionName }}
+    subscriptionId: ${{ parameters.subscriptionId }}
+    location: ${{ parameters.location }}
+    csmFile: ${{ parameters.templateRootFolder }}/../bicep/main.bicep
+    overrideParameters: >
+      -location ${{ parameters.location }}
+      -namePrefix ${{ parameters.namePrefix }}
+      -tags ${{ parameters.tags }}
+    deploymentName: ${{ parameters.namePrefix }}-main-$(Build.BuildNumber)
+    deploymentOutputs: mainOutputs      
+
+- pwsh: |
+    $outputs = ConvertFrom-Json '$(mainOutputs)'
+    $outputArray = $outputs.enableDiagnosticSettingsLogIds.value.Split(" ") | ConvertTo-Json -Compress
+    
+    Write-Host "##vso[task.setvariable variable=enableDiagnosticSettingsLogIds;isOutput=true]$($outputArray)"
+    Write-Host "##vso[task.setvariable variable=workspaceId;isOutput=true]$($outputs.logId.value)"
+    Write-Host "##vso[task.setvariable variable=storageAccountId;isOutput=true]$($outputs.stId.value)"
+  name: mainVars
+  displayName: Set variables from main deployment
+
+- task: AzurePowerShell@5
+  displayName: Create Diagnostic Settings
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnectionName }}
+    ScriptType: FilePath
+    ScriptPath: ${{ parameters.templateRootFolder }}/../scripts/Create-DiagnosticSettings.ps1
+    ScriptArguments: >
+      -ResourceIds '$(mainVars.enableDiagnosticSettingsLogIds)'
+      -DiagnosticSettingsName Logs-to-Core
+      -WorkspaceId $(mainVars.workspaceId)
+      -StorageAccountId $(mainVars.storageAccountId)
+    azurePowerShellVersion: LatestVersion

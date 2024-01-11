@@ -1,0 +1,15 @@
+[
+  {
+    "name": "AllowRDP",
+    "properties": {
+      "access": "Allow",
+      "destinationAddressPrefix": "*",
+      "destinationPortRange": "3389",
+      "direction": "Inbound",
+      "priority": 2000,
+      "protocol": "Tcp",
+      "sourceAddressPrefix": "*",
+      "sourcePortRange": "*"
+    }
+  }
+]

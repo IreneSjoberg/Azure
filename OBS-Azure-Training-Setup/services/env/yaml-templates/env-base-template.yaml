@@ -1,0 +1,93 @@
+parameters: 
+
+  serviceConnectionName: ''     # Azure DevOps service connection name
+  subscriptionId: ''            # Subscription ID context
+  location: ''                  # Azure region to be used for the environment resources
+  namePrefix: ''                # Naming prefix for the environment resources
+
+  vnetAddressPrefix: ''         # VNET address prefix that will be used for the environment resources
+
+  dnsRgName: ''                 # Name of the resource group that contains Private DNS Zones in the subscription
+  remoteVnetPeeringIds: []      # Remote VNET ID's to which the environment VNET will be peered
+  workspaceId: ''               # Log analytics workspace resource ID that will be used for collecting logs
+  storageAccountId: ''          # Storage account resource ID that will be used for archiving logs
+
+  runRsvBackupScript: true      # Conditional whether to run the RSV backup script or not
+
+  # Tags
+  tags: >
+    {
+      "Solution": "Environment Setup",
+      "CreatedBy": "$(Build.RequestedForEmail)",
+      "ManagedBy": "Orange",
+      "Pipeline": "$(Build.DefinitionName)",
+      "PipelineBuildNumber": "$(Build.BuildNumber)",
+      "PipelineJob": "$(System.JobDisplayName)",
+      "PipelineStage": "$(System.StageDisplayName)",
+      "ProjectName": "$(System.TeamProject)",
+      "Reason": "$(Build.Reason)",
+      "Repository": "$(Build.Repository.Name)",
+      "SourceBranchName": "$(Build.SourceBranchName)",
+      "SourceVersion": "$(Build.SourceVersion)"
+    }
+
+  # Template pathing
+  templateRootFolder: $(System.DefaultWorkingDirectory)/services/env/yaml-templates
+
+steps:
+
+- task: AzureResourceManagerTemplateDeployment@3
+  displayName: Deploy Env Resources
+  inputs:
+    deploymentScope: Subscription
+    azureResourceManagerConnection: ${{ parameters.serviceConnectionName }}
+    subscriptionId: ${{ parameters.subscriptionId }}
+    location: ${{ parameters.location }}
+    csmFile: ${{ parameters.templateRootFolder }}/../bicep/main.bicep
+    overrideParameters: >
+      -location ${{ parameters.location }}
+      -namePrefix ${{ parameters.namePrefix }}
+      -vnetAddressPrefix ${{ parameters.vnetAddressPrefix }}
+      -dnsRgName ${{ parameters.dnsRgName }}
+      -workspaceId ${{ parameters.workspaceId }}
+      -remoteVnetPeeringIds ${{ convertToJson(parameters.remoteVnetPeeringIds) }}
+      -tags ${{ parameters.tags }}
+    deploymentName: ${{ parameters.namePrefix }}-main-$(Build.BuildNumber)
+    deploymentOutputs: mainOutputs
+
+- pwsh: |
+    $outputs = ConvertFrom-Json '$(mainOutputs)'
+
+    $EnableDiagnosticSettingsLogIds = $outputs.enableDiagnosticSettingsLogIds.value.Split(" ") | ConvertTo-Json -Compress
+    Write-Host "##vso[task.setvariable variable=enableDiagnosticSettingsLogIds;isOutput=true]$($EnableDiagnosticSettingsLogIds)"
+
+    Write-Host "##vso[task.setvariable variable=stId;isOutput=true]$($outputs.stId.value)"
+    Write-Host "##vso[task.setvariable variable=rsvId;isOutput=true]$($outputs.rsvId.value)"
+  name: mainVars
+  displayName: Set variables from main deployment
+
+- task: AzurePowerShell@5
+  displayName: Create Diagnostic Settings
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnectionName }}
+    ScriptType: FilePath
+    ScriptPath: ${{ parameters.templateRootFolder }}/../scripts/Create-DiagnosticSettings.ps1
+    ScriptArguments: >
+      -ResourceIds '$(mainVars.enableDiagnosticSettingsLogIds)'
+      -DiagnosticSettingsName Logs-to-Core
+      -WorkspaceId ${{ parameters.workspaceId }}
+      -StorageAccountId ${{ parameters.storageAccountId }}
+    azurePowerShellVersion: LatestVersion
+
+- ${{ if or( eq(parameters.runRsvBackupScript, true), eq( variables['Build.Reason'], 'Schedule') ) }}:
+
+  - task: AzurePowerShell@5
+    displayName: Enable RSV backups on fileshares
+    inputs:
+      azureSubscription: ${{ parameters.serviceConnectionName }}
+      ScriptType: FilePath
+      ScriptPath: ${{ parameters.templateRootFolder }}/../scripts/Enable-RsvFileShareBackups.ps1
+      ScriptArguments: >
+        -RecoveryServicesVaultId $(mainVars.rsvId)
+        -StorageAccountId $(mainVars.stId)
+      azurePowerShellVersion: LatestVersion

@@ -1,0 +1,35 @@
+trigger: none
+
+pool: obstraining-agentpool
+
+### Parameters ###
+parameters:
+- name: RunRsvBackupScript
+  displayName: Runs RSV backup script
+  type: boolean
+  default: false
+
+### Variables ###
+variables:
+  workspaceId: /subscriptions/c0b461ca-cefc-4212-835c-0459a2fd26de/resourcegroups/obs-core-log-rg/providers/microsoft.operationalinsights/workspaces/obs-core-log
+  storageAccountId: /subscriptions/c0b461ca-cefc-4212-835c-0459a2fd26de/resourceGroups/obs-core-log-rg/providers/Microsoft.Storage/storageAccounts/obscorearchivest
+
+steps:
+
+- template: ../services/env/yaml-templates/env-base-template.yaml
+  parameters:
+    serviceConnectionName: sub-instructor1
+    subscriptionId: c0b461ca-cefc-4212-835c-0459a2fd26de # Instructor-1
+    location: swedencentral
+    namePrefix: obs-stg
+    vnetAddressPrefix: 10.200.9.0/24
+    dnsRgName: obs-core-dns-rg
+    remoteVnetPeeringIds:
+      - /subscriptions/c0b461ca-cefc-4212-835c-0459a2fd26de/resourceGroups/obs-core-log-rg/providers/Microsoft.Network/virtualNetworks/obs-core-log-vnet
+      - /subscriptions/c0b461ca-cefc-4212-835c-0459a2fd26de/resourceGroups/obs-core-mgmt-rg/providers/Microsoft.Network/virtualNetworks/obs-core-mgmt-vnet
+      - /subscriptions/c0b461ca-cefc-4212-835c-0459a2fd26de/resourceGroups/obstraining-agentpool-rg/providers/Microsoft.Network/virtualNetworks/obstraining-agentpool-vnet
+    workspaceId: $(workspaceId)
+    storageAccountId: $(storageAccountId)
+    runRsvBackupScript: ${{ parameters.RunRsvBackupScript }}
+
+

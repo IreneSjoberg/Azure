@@ -1,0 +1,21 @@
+trigger: none
+
+pool: obstraining-agentpool
+
+### Schedules ###
+schedules:
+- cron: "0 8 * * 1"
+  displayName: Weekly monday always
+  branches:
+    include:
+    - main
+  always: true
+
+steps:
+
+- template: ../services/core/yaml-templates/core-base-template.yaml
+  parameters:
+    serviceConnectionName: sub-instructor1
+    subscriptionId: c0b461ca-cefc-4212-835c-0459a2fd26de # Instructor-1
+    location: swedencentral
+    namePrefix: obs-core
