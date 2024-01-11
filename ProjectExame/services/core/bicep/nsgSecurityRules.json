@@ -1,0 +1,41 @@
+[
+    {
+      "name": "AllowSSH",
+      "properties": {
+        "access": "Allow",
+        "destinationAddressPrefix": "*",
+        "destinationPortRange": "22",
+        "direction": "Inbound",
+        "priority": 1000,
+        "protocol": "Tcp",
+        "sourceAddressPrefix": "*",
+        "sourcePortRange": "*"
+      }
+    },
+    {
+      "name": "AllowRDP",
+      "properties": {
+        "access": "Allow",
+        "destinationAddressPrefix": "*",
+        "destinationPortRange": "3389",
+        "direction": "Inbound",
+        "priority": 1001,
+        "protocol": "Tcp",
+        "sourceAddressPrefix": "95.193.131.119",
+        "sourcePortRange": "*"
+      }
+    },
+    {
+      "name": "AllowOutboundSSH",
+      "properties": {
+        "access": "Allow",
+        "destinationAddressPrefix": "*",
+        "destinationPortRange": "22",
+        "direction": "Outbound",
+        "priority": 2000,
+        "protocol": "*",
+        "sourceAddressPrefix": "*",
+        "sourcePortRange": "*"
+      }
+    }
+  ]

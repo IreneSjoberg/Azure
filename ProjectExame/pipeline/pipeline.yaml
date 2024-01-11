@@ -1,0 +1,67 @@
+trigger: none
+
+pool:
+  vmImage: ubuntu-latest
+
+# Schedules
+# schedules:
+# - cron: "0 23 * * *"
+#   displayName: Daily Always
+#   branches:
+#     include:
+#     - main
+#   always: true
+
+parameters:
+
+- name: RunBackupScript
+  displayName: Runs backup script
+  type: boolean
+  default: false
+
+# Variables
+variables:
+
+  addressSpace: 10.0.3.0/24
+  location: swedencentral
+  namePrefix: env
+  subscriptionId: 15657746-89b9-4f62-ad76-76f1d110a14c # Student-2
+
+# Stages
+stages:
+
+- stage: Stage1
+  displayName: 1st stage
+
+  jobs:
+
+  - job:
+
+    steps:
+
+    - task: AzureResourceManagerTemplateDeployment@3
+      displayName: Deploy Infrastructure
+      inputs:
+        deploymentScope: Subscription
+        azureResourceManagerConnection: sub-irenejohnmikaela-student-2
+        subscriptionId: $(subscriptionId)
+        action: Create Or Update Resource Group
+        location: $(location)
+        csmFile: bicep/main.bicep
+        deploymentOutputs: mainOutputs
+        overrideParameters: >
+          -addressSpace $(addressSpace)
+          -location $(location)
+          -namePrefix $(namePrefix)
+
+    - ${{ if eq(parameters.RunBackupScript, true) }}:
+      - task: AzurePowerShell@5
+        displayName: Backup Script
+        inputs:
+          azureSubscription: sub-irenejohnmikaela-student-2
+          ScriptPath: scripts/recoveryservicevault.ps1
+          azurePowerShellVersion: LatestVersion
+          ScriptArguments: >
+            -RecoveryServicesVault $(mainOutputs.rsvName.value)
+            -ResourceGroupName $(mainOutputs.resourceGroupName.value)
+            -StorageAccountName $(mainOutputs.storageAccountName.value)

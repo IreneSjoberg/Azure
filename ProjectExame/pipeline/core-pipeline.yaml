@@ -1,0 +1,34 @@
+trigger: none
+
+pool:
+  vmImage: ubuntu-latest
+
+# Variables
+variables:
+
+  myName: Test
+  subscriptionId: 15657746-89b9-4f62-ad76-76f1d110a14c # Student-2
+  location: swedencentral 
+
+# Stages
+stages:
+
+- stage: Stage1
+  displayName: 1st stage
+
+  jobs: 
+
+  - job: 
+    displayName: Job 1
+
+    steps:
+
+    - task: AzureResourceManagerTemplateDeployment@3
+      displayName: Deploy Infrastructure
+      inputs:
+        deploymentScope: Subscription
+        azureResourceManagerConnection: sub-irenejohnmikaela-student-2
+        subscriptionId: $(subscriptionId)
+        action: Create Or Update Resource Group
+        location: $(location)
+        csmFile: services/core/bicep/main.bicep
